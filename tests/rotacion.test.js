@@ -29,21 +29,26 @@ test('piscina mayor que turnos/día: descansos alternados y cobertura completa',
   assert.ok(Math.max(...cargas) - Math.min(...cargas) <= 1, `cargas equitativas: ${cargas}`);
 });
 
-test('ventana de descanso: no se repite turno temprano tras cierre tardío', () => {
-  // 2 turnos: uno a las 05:00 y uno a las 20:00. U1 cierra 20:00 el día 1;
-  // el día 2 el turno de las 05:00 no debe ser de U1 (vueltas hacia atrás sin 10h).
+test('ventana de descanso: quien cierra 20:00 no toma el 05:00 del día siguiente', () => {
+  // 2 turnos: uno a las 05:00 y uno a las 20:00. Resultado determinista trazado:
+  //   día 1: U1→05:00, U2→20:00
+  //   día 2: U2 queda bloqueada por descanso (<10 h desde el cierre de 20:00)
+  //          para el turno de las 05:00, así que ese turno lo toma U1.
+  // Aserciones incondicionales (sin `if` que pueda volver el test vacuo):
   const pool = ['U1', 'U2'];
   const horas = ['05:00', '20:00'];
   const dias = semana([horas, horas]);
   const asig = generarSemanaRuta({ poolUnidades: pool, diasSemana: dias, indisponibilidad: sinIndisponibilidad });
   const d1 = asig.filter(a => a.fecha === '2026-09-01');
   const d2 = asig.filter(a => a.fecha === '2026-09-02');
-  const u1d1 = d1.find(a => a.unidadId === 'U1');
-  const u1d2 = d2.find(a => a.unidadId === 'U1');
-  // Si U1 hizo el turno 20:00 el día 1, el día 2 no puede tener un turno anterior en índice
-  if (u1d1?.turnoIndex === 1 && u1d2) {
-    assert.ok(u1d2.turnoIndex >= 1, 'U1 no debe volver a un turno más temprano tras cerrar a las 20:00');
-  }
+  const cierreTardioD1 = d1.find(a => a.turnoIndex === 1)?.unidadId;
+  const tempranoD2 = d2.find(a => a.turnoIndex === 0)?.unidadId;
+  // (1) cobertura de ambos turnos clave
+  assert.ok(cierreTardioD1, 'el turno de las 20:00 del día 1 debe estar cubierto');
+  assert.ok(tempranoD2, 'el turno de las 05:00 del día 2 debe estar cubierto');
+  // (2) regla de descanso >=10 h: el que cerró 20:00 el día 1 NO toma el 05:00 del día 2
+  assert.notEqual(tempranoD2, cierreTardioD1,
+    'quien cerró a las 20:00 no debe tomar el turno de las 05:00 del día siguiente (<10 h de descanso)');
 });
 
 test('unidad indisponible: sus turnos los cubren otras de la piscina', () => {
