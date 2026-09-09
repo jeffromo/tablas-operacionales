@@ -201,3 +201,22 @@ select[data-punto] { padding: 3px 6px; font-size: 12px; }
   #tabs button { padding: 7px 12px; font-size: 13px; }
   .tarjeta { padding: 12px; }
 }
+/* ============ Acordeón de rutas ============ */
+.cabecera-ruta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: var(--color-primario-suave);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-chico);
+  padding: 10px 14px;
+  font-size: 14px;
+}
+.cabecera-ruta:hover { background: #e0ecff; border-color: var(--color-primario); }
+.cabecera-ruta strong { color: var(--color-primario-oscuro); }
+.chevron { display: inline-block; transition: transform .15s; color: var(--color-primario); }
+.ruta-acordeon.abierta .chevron { transform: rotate(90deg); }
+.resumen-ruta { margin-left: auto; color: var(--color-texto-suave); font-size: 12px; }
+[data-cuerpo] > .fila:first-child { margin-top: 12px; }

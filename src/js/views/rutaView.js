@@ -4,6 +4,9 @@ import { aMinutos } from '../engine/fechas.js';
 // Etiquetas cortas para el selector de días (0=domingo .. 6=sábado), spec §2.3.
 const DIAS_SEM = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
 
+// Rutas con el acordeón abierto (ids persisten entre re-renders de la vista).
+const expandidas = new Set();
+
 // Patrón anti-XSS: nombre de ruta, etiqueta de grupo, horas y puntos provienen
 // del estado/JSON importado, así que todo dato se inserta con textContent /
 // .value / .checked sobre esqueletos estáticos; nada se interpola en innerHTML.
@@ -22,8 +25,10 @@ export function renderRutas(el) {
   el.querySelector('#agregar').onclick = () => {
     const nombre = el.querySelector('#nueva-ruta').value.trim();
     if (!nombre) return alert('Escribe un nombre de ruta');
-    est.rutas.push({ id: crypto.randomUUID(), nombre, peso: 1,
-      gruposDia: [{ nombre: 'L-D', dias: [0,1,2,3,4,5,6], turnos: [] }] });
+    const nueva = { id: crypto.randomUUID(), nombre, peso: 1,
+      gruposDia: [{ nombre: 'L-D', dias: [0,1,2,3,4,5,6], turnos: [] }] };
+    est.rutas.push(nueva);
+    expandidas.add(nueva.id);
     guardarEstado(); renderRutas(el);
   };
   el.querySelector('#exportar').onclick = () => exportarJSON();
@@ -36,18 +41,46 @@ export function renderRutas(el) {
 }
 
 function tarjetaRuta(ruta, el) {
+  ruta.id ??= crypto.randomUUID();
   const div = document.createElement('div');
-  div.className = 'tarjeta';
+  div.className = 'tarjeta ruta-acordeon';
+  const abierta = expandidas.has(ruta.id);
   div.innerHTML = `
-    <div class="fila">
+    <button type="button" class="cabecera-ruta" data-toggle aria-expanded="${abierta}">
+      <span class="chevron" aria-hidden="true">▸</span>
       <strong data-nombre></strong>
-      <label>Peso <input type="number" min="0" style="width:60px" data-peso></label>
-      <button data-borrar>Eliminar</button>
-    </div>
-    <div data-grupos></div>
-    <button data-agregar-grupo>Agregar grupo de día</button>`;
+      <span class="resumen-ruta" data-resumen></span>
+    </button>
+    <div data-cuerpo>
+      <div class="fila">
+        <label>Peso <input type="number" min="0" style="width:60px" data-peso></label>
+        <button data-borrar>Eliminar</button>
+      </div>
+      <div data-grupos></div>
+      <button data-agregar-grupo>Agregar grupo de día</button>
+    </div>`;
   div.querySelector('[data-nombre]').textContent = ruta.nombre;
+  const nGrupos = ruta.gruposDia.length;
+  const nTurnos = ruta.gruposDia.reduce((n, g) => n + (g.turnos?.length || 0), 0);
+  div.querySelector('[data-resumen]').textContent =
+    `${nGrupos} ${nGrupos === 1 ? 'grupo' : 'grupos'} · ${nTurnos} turnos · peso ${Number(ruta.peso) || 0}`;
   div.querySelector('[data-peso]').value = String(Number(ruta.peso) || 0);
+  const cuerpo = div.querySelector('[data-cuerpo]');
+  cuerpo.hidden = !abierta;
+  if (abierta) div.classList.add('abierta');
+  div.querySelector('[data-toggle]').onclick = () => {
+    if (expandidas.has(ruta.id)) {
+      expandidas.delete(ruta.id);
+      div.classList.remove('abierta');
+      cuerpo.hidden = true;
+      div.querySelector('[data-toggle]').setAttribute('aria-expanded', 'false');
+    } else {
+      expandidas.add(ruta.id);
+      div.classList.add('abierta');
+      cuerpo.hidden = false;
+      div.querySelector('[data-toggle]').setAttribute('aria-expanded', 'true');
+    }
+  };
   div.querySelector('[data-peso]').onchange = e => { ruta.peso = +e.target.value; guardarEstado(); };
   div.querySelector('[data-borrar]').onclick = () => {
     const est = estadoActual();
