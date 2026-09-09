@@ -1,5 +1,6 @@
 import { estadoActual } from '../state.js';
 import { descargarExcel } from '../export/excel.js';
+import { semanarDias } from '../engine/fechas.js';
 
 const DIAS = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
 const etiqueta = f => {
@@ -15,6 +16,60 @@ function celda(texto, clase) {
   td.textContent = String(texto);
   if (clase) td.className = clase;
   return td;
+}
+
+// Crea un acordeón (tarjeta con cabecera plegable) y devuelve su cuerpo.
+function acordeon(titulo, resumen, abierta) {
+  const acc = document.createElement('div');
+  acc.className = 'tarjeta acordeon-resultado';
+  acc.innerHTML = `
+    <button type="button" class="cabecera-ruta" data-toggle aria-expanded="${abierta}">
+      <span class="chevron" aria-hidden="true">▸</span>
+      <strong data-titulo></strong>
+      <span class="resumen-ruta" data-resumen></span>
+    </button>
+    <div data-cuerpo></div>`;
+  acc.querySelector('[data-titulo]').textContent = titulo;
+  acc.querySelector('[data-resumen]').textContent = resumen;
+  const cuerpo = acc.querySelector('[data-cuerpo]');
+  cuerpo.hidden = !abierta;
+  if (abierta) acc.classList.add('abierta');
+  acc.querySelector('[data-toggle]').onclick = () => {
+    const nueva = cuerpo.hidden;
+    cuerpo.hidden = !nueva;
+    acc.classList.toggle('abierta', nueva);
+    acc.querySelector('[data-toggle]').setAttribute('aria-expanded', String(nueva));
+  };
+  return { acc, cuerpo };
+}
+
+// Tabla operacional de UN conjunto de días (una semana) de una ruta.
+function tablaSemana(diasGrupo, ruta, plan, nTurnos) {
+  const fechas = diasGrupo.map(d => d.fecha);
+  const tabla = document.createElement('table');
+  const thead = document.createElement('thead');
+  const trh = document.createElement('tr');
+  for (const texto of ['TURNO', 'HORA', 'PUNTO', ...fechas.map(etiqueta)]) {
+    const th = document.createElement('th');
+    th.textContent = texto;
+    trh.appendChild(th);
+  }
+  thead.appendChild(trh);
+
+  const tbody = document.createElement('tbody');
+  for (let i = 0; i < nTurnos; i++) {
+    const t0 = diasGrupo.flatMap(d => d.turnos)
+      .find(t => t.rutaId === ruta.id && t.turnoIndex === i);
+    const tr = document.createElement('tr');
+    tr.append(celda(i + 1), celda(t0?.hora || '', 'hora'), celda(t0?.punto || ''));
+    for (const f of fechas) {
+      const a = plan.asignaciones.find(x => x.fecha === f && x.rutaId === ruta.id && x.turnoIndex === i);
+      tr.append(celda(a?.unidadId ?? ''));
+    }
+    tbody.appendChild(tr);
+  }
+  tabla.append(thead, tbody);
+  return tabla;
 }
 
 export function renderResultado(el) {
@@ -59,10 +114,14 @@ export function renderResultado(el) {
     el.appendChild(linea);
   }
 
-  // Una tabla por GRUPO de día (no una mezcla de todos los grupos de la ruta):
-  // las fechas del plan se filtran por grupo.dias (dow) y solo cuentan para el
-  // primer grupo que declara ese día, igual que turnosVigentes en el motor.
-  // Cada tabla va en un acordeón (cabecera con resumen, cuerpo plegable).
+  // Una sección por GRUPO de día y, dentro, una sub-sección por SEMANA del
+  // mes: la visualización es semana a semana (cada semana con su tabla).
+  // Las fechas del plan se filtran por grupo.dias (dow) y solo cuentan para
+  // el primer grupo que declara ese día, igual que turnosVigentes en el motor.
+  const semanasMes = semanarDias(plan.dias.map(d => d.fecha));
+  const semanaDe = new Map();
+  semanasMes.forEach((fs, w) => fs.forEach(f => semanaDe.set(f, w)));
+
   let primerGrupo = true;
   for (const ruta of rutas) {
     for (const grupo of ruta.gruposDia) {
@@ -77,57 +136,31 @@ export function renderResultado(el) {
         .filter(t => t.rutaId === ruta.id)
         .map(t => t.turnoIndex))) + 1;
 
-      const acc = document.createElement('div');
-      acc.className = 'tarjeta ruta-acordeon acordeon-resultado';
-      const abierta = primerGrupo;
+      const { acc, cuerpo } = acordeon(
+        grupo.nombre ? `${ruta.nombre} ${grupo.nombre}` : ruta.nombre,
+        `${fechas.length} días · ${nTurnos} turnos`,
+        primerGrupo);
       primerGrupo = false;
-      acc.innerHTML = `
-        <button type="button" class="cabecera-ruta" data-toggle aria-expanded="${abierta}">
-          <span class="chevron" aria-hidden="true">▸</span>
-          <strong data-titulo></strong>
-          <span class="resumen-ruta" data-resumen></span>
-        </button>
-        <div data-cuerpo></div>`;
-      acc.querySelector('[data-titulo]').textContent =
-        grupo.nombre ? `${ruta.nombre} ${grupo.nombre}` : ruta.nombre;
-      acc.querySelector('[data-resumen]').textContent =
-        `${fechas.length} días · ${nTurnos} turnos`;
-      const cuerpo = acc.querySelector('[data-cuerpo]');
-      cuerpo.hidden = !abierta;
-      if (abierta) acc.classList.add('abierta');
-
-      acc.querySelector('[data-toggle]').onclick = () => {
-        const nueva = cuerpo.hidden;
-        cuerpo.hidden = !nueva;
-        acc.classList.toggle('abierta', nueva);
-        acc.querySelector('[data-toggle]').setAttribute('aria-expanded', String(nueva));
-      };
       el.appendChild(acc);
 
-      const tabla = document.createElement('table');
-      const thead = document.createElement('thead');
-      const trh = document.createElement('tr');
-      for (const texto of ['TURNO', 'HORA', 'PUNTO', ...fechas.map(etiqueta)]) {
-        const th = document.createElement('th');
-        th.textContent = texto;
-        trh.appendChild(th);
+      // Días del grupo agrupados por semana del mes (huecos = semanas sin días).
+      const porSemana = [];
+      for (const d of diasGrupo) {
+        const w = semanaDe.get(d.fecha);
+        (porSemana[w] ||= []).push(d);
       }
-      thead.appendChild(trh);
-
-      const tbody = document.createElement('tbody');
-      for (let i = 0; i < nTurnos; i++) {
-        const t0 = diasGrupo.flatMap(d => d.turnos)
-          .find(t => t.rutaId === ruta.id && t.turnoIndex === i);
-        const tr = document.createElement('tr');
-        tr.append(celda(i + 1), celda(t0?.hora || '', 'hora'), celda(t0?.punto || ''));
-        for (const f of fechas) {
-          const a = plan.asignaciones.find(x => x.fecha === f && x.rutaId === ruta.id && x.turnoIndex === i);
-          tr.append(celda(a?.unidadId ?? ''));
-        }
-        tbody.appendChild(tr);
-      }
-      tabla.append(thead, tbody);
-      cuerpo.appendChild(tabla);
+      let primeraSemana = true;
+      porSemana.forEach((diasSem, w) => {
+        if (!diasSem) return;
+        const fechasSem = diasSem.map(d => d.fecha);
+        const { acc: accSem, cuerpo: cuerpoSem } = acordeon(
+          `Semana ${w + 1}`,
+          `${fechasSem.length} días · ${etiqueta(fechasSem[0])} – ${etiqueta(fechasSem[fechasSem.length - 1])}`,
+          primeraSemana);
+        primeraSemana = false;
+        cuerpoSem.appendChild(tablaSemana(diasSem, ruta, plan, nTurnos));
+        cuerpo.appendChild(accSem);
+      });
     }
   }
 

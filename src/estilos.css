@@ -246,3 +246,7 @@ select[data-punto] { padding: 3px 6px; font-size: 12px; }
   -webkit-overflow-scrolling: touch;
 }
 .ruta-acordeon [data-grupos] .tarjeta > table { margin: 10px 0; }
+
+/* ============ Sub-acordeones de semana en Resultado ============ */
+.acordeon-resultado .acordeon-resultado { margin: 8px 0; padding: 10px 12px; }
+.acordeon-resultado .acordeon-resultado .resumen-ruta { font-size: 12px; }
