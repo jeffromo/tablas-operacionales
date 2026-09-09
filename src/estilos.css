@@ -236,3 +236,13 @@ select[data-punto] { padding: 3px 6px; font-size: 12px; }
 .acordeon-resultado { padding: 12px 14px; }
 .acordeon-resultado [data-cuerpo] { margin-top: 10px; }
 .acordeon-resultado table { margin: 0; }
+
+/* ============ Scroll horizontal DENTRO de las tarjetas ============ */
+/* Las tablas anchas (31 días) deben desplazarse dentro de su tarjeta,
+   no desbordar la página ni escaparse del acordeón. */
+.acordeon-resultado [data-cuerpo],
+.ruta-acordeon [data-grupos] .tarjeta {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.ruta-acordeon [data-grupos] .tarjeta > table { margin: 10px 0; }
