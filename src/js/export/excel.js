@@ -1,13 +1,12 @@
 // Convierte el plan a un workbook XLSX. En navegador usa la global XLSX
 // (vendor/xlsx.full.min.js cargado con <script>); en Node, require del UMD.
-import { createRequire } from 'module';
 import { aMinutos } from '../engine/fechas.js';
 
 function getXLSX() {
+  // Navegador: el <script> de vendor/ carga antes que main.js.
+  // Node (tests): tests/excel.test.js precarga globalThis.XLSX.
   if (typeof globalThis.XLSX !== 'undefined') return globalThis.XLSX;
-  // Node (solo tests): carga UMD vía createRequire. FIX vs brief: desde
-  // src/js/export/ son TRES niveles hasta la raíz (../../ era src/).
-  return createRequire(import.meta.url)('../../../vendor/xlsx.full.min.js');
+  throw new Error('SheetJS no está cargada');
 }
 
 const DIAS = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const XLSX = require('../vendor/xlsx.full.min.js');
+globalThis.XLSX = XLSX; // excel.js (navegador) lee la global; Node tests la precargan
 import { generaPlanMes } from '../src/js/engine/index.js';
 import { planAWorkbook } from '../src/js/export/excel.js';
 
