@@ -54,6 +54,9 @@ export function generaPlanMes({ rutas, unidades, mes, anio }) {
   const corregido = corregirEquidad({                                    // Paso 4
     piscinas: piscinas0, asignacionesSemana, unidades,
     regenerarSemana, tolerancia: 1,
+    // Guardia de cobertura (spec §5 Paso 4): un swap que mejore equidad pero
+    // deje turnos descubiertos se rechaza. La demanda ya está calculada aquí.
+    demanda: turnosPorSemanaRuta,
   });
   asignacionesSemana = corregido.asignacionesSemana;
 

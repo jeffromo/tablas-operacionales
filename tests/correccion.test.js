@@ -98,3 +98,96 @@ test('corregirEquidad ejecuta intercambios: la dispersión baja y cambios regist
     `cambios debe registrar al menos un intercambio: ${JSON.stringify(r.cambios)}`,
   );
 });
+
+// FIX hallazgo 4 (spec §5 Paso 4): un swap puede mejorar la equidad pero dejar
+// turnos descubiertos (flota justa + indisponibilidades); corregirEquidad debe
+// rechazarlo cuando recibe la demanda de la semana.
+test('corregirEquidad rechaza un swap que mejoraria equidad pero degradaria cobertura', () => {
+  // Escenario (3 fechas: w0 = [f0,f1], w1 = [f2]; demanda A=2 turnos/fecha, B=1):
+  //   U0 indisponible todo el mes; U2 indisponible en f2.
+  //   w0: A [U1,U2] cubierta, B [U3] cubierta.
+  //   w1: A [U1,U2] → t0=U1, t1 DESCUBIERTO; B [U4,U0] → U4.
+  // Días trabajados (fechas distintas): U1:3, U2:2, U3:2, U4:1
+  // → dispersión 2 > tolerancia 1: el pase intenta swaps.
+  // El swap U1(A,w1) ↔ U0(B,w1) dejaría U1:2,U2:2,U3:2,U4:1
+  // → dispersión 1 (¡mejora la equidad!) pero A f2 con t0 y t1 descubiertos:
+  // cobertura 1 → 2. El guardia debe rechazarlo.
+  const disponible = (u, fecha) => u !== 'U0' && !(fecha === 'f2' && u === 'U2');
+  const demanda = {
+    0: { A: [{ fecha: 'f0', turnoIndex: 0 }, { fecha: 'f0', turnoIndex: 1 },
+             { fecha: 'f1', turnoIndex: 0 }, { fecha: 'f1', turnoIndex: 1 }],
+         B: [{ fecha: 'f0', turnoIndex: 0 }, { fecha: 'f1', turnoIndex: 0 }] },
+    1: { A: [{ fecha: 'f2', turnoIndex: 0 }, { fecha: 'f2', turnoIndex: 1 }],
+         B: [{ fecha: 'f2', turnoIndex: 0 }] },
+  };
+  const fechasDe = { 0: ['f0', 'f1'], 1: ['f2'] };
+  const turnosDe = { A: 2, B: 1 };
+
+  // Simula generarSemanaRuta: por fecha, turnos → unidades disponibles de la
+  // piscina en orden; si no alcanzan, quedan descubiertos.
+  const crearSim = (piscinas) => {
+    const regenerar = (w) => {
+      const out = [];
+      for (const [ruta, units] of Object.entries(piscinas[w])) {
+        for (const fecha of fechasDe[w]) {
+          let asignados = 0;
+          for (const u of units) {
+            if (asignados >= turnosDe[ruta]) break;
+            if (!disponible(u, fecha)) continue;
+            out.push({ fecha, rutaId: ruta, turnoIndex: asignados, unidadId: u });
+            asignados++;
+          }
+        }
+      }
+      return out;
+    };
+    return { piscinas, regenerar, asignacionesSemana: [regenerar(0), regenerar(1)] };
+  };
+  const sinCubrirDe = (regs, dem) => {
+    const cub = new Set(regs.map(a => `${a.rutaId}|${a.fecha}|${a.turnoIndex}`));
+    let n = 0;
+    for (const [rid, ts] of Object.entries(dem))
+      for (const t of ts)
+        if (!cub.has(`${rid}|${t.fecha}|${t.turnoIndex}`)) n++;
+    return n;
+  };
+  const unidades = ['U0', 'U1', 'U2', 'U3', 'U4'].map(id => ({ id }));
+
+  const piscinas = [
+    { A: ['U1', 'U2'], B: ['U3'] },
+    { A: ['U1', 'U2'], B: ['U4', 'U0'] },
+  ];
+  const sim = crearSim(piscinas);
+  assert.equal(sinCubrirDe(sim.asignacionesSemana[1], demanda[1]), 1,
+    'estado inicial: 1 turno descubierto en la semana 1');
+  const cargasIniciales = [...diasTrabajados(sim.asignacionesSemana.flat()).values()];
+  assert.ok(Math.max(...cargasIniciales) - Math.min(...cargasIniciales) >= 2,
+    `dispersión inicial ${Math.max(...cargasIniciales) - Math.min(...cargasIniciales)} supera la tolerancia: el pase intenta swaps`);
+
+  const r = corregirEquidad({
+    piscinas: sim.piscinas, asignacionesSemana: sim.asignacionesSemana, unidades,
+    regenerarSemana: sim.regenerar, tolerancia: 1, demanda,
+  });
+
+  // El swap que mejoraba equidad fue rechazado...
+  assert.equal(r.cambios.length, 0, `cambios: ${JSON.stringify(r.cambios)}`);
+  // ...la cobertura no bajó...
+  assert.equal(sinCubrirDe(r.asignacionesSemana[1], demanda[1]), 1,
+    'la cobertura no debe degradarse');
+  // ...y las piscinas quedaron como estaban (swap revertido).
+  assert.deepEqual(r.piscinas[1].A, ['U1', 'U2']);
+  assert.deepEqual(r.piscinas[1].B, ['U4', 'U0']);
+
+  // Contrafactual: sin el guardia (sin demanda) el MISMO swap se acepta
+  // (dispersión 2 → 1) dejando 2 turnos descubiertos — exactamente lo que el
+  // guardia impide.
+  const clon = structuredClone(piscinas);
+  const sim2 = crearSim(clon);
+  const r2 = corregirEquidad({
+    piscinas: sim2.piscinas, asignacionesSemana: sim2.asignacionesSemana,
+    unidades, regenerarSemana: sim2.regenerar, tolerancia: 1,
+  });
+  assert.equal(r2.cambios.length, 1, 'sin demanda el swap mejoraría equidad y se aceptaría');
+  assert.equal(sinCubrirDe(r2.asignacionesSemana[1], demanda[1]), 2,
+    'sin guardia la cobertura caería: 2 turnos descubiertos');
+});

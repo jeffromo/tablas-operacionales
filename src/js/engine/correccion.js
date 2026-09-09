@@ -14,7 +14,11 @@ export function diasTrabajados(asignaciones) {
 // Paso 4: intercambia unidades entre piscinas de distintas rutas (misma semana)
 // hasta que la dispersión de días trabajados en el mes quede dentro de la tolerancia.
 // `regenerarSemana(w)` regenera la semana w con las piscinas actuales.
-export function corregirEquidad({ piscinas, asignacionesSemana, unidades, regenerarSemana, tolerancia = 1, maxIter = 200 }) {
+// `demanda` (opcional, estructura turnosPorSemanaRuta de index.js:
+// demanda[w][rutaId] = [{fecha, turnoIndex, ...}]) habilita el guardia de
+// cobertura del spec §5 Paso 4: un swap solo se acepta si NO aumenta los
+// turnos descubiertos de la semana, aunque mejore la equidad.
+export function corregirEquidad({ piscinas, asignacionesSemana, unidades, regenerarSemana, tolerancia = 1, maxIter = 200, demanda }) {
   // FIX vs brief: `cambios` es un array (el test exige Array.isArray(r.cambios)),
   // no un contador numérico; cada intercambio aplicado se registra como objeto.
   const cambios = [];
@@ -24,6 +28,23 @@ export function corregirEquidad({ piscinas, asignacionesSemana, unidades, regene
     return vals.length ? Math.max(...vals) - Math.min(...vals) : 0;
   };
 
+  // Turnos descubiertos de la semana w: claves (rutaId|fecha|turnoIndex) de la
+  // demanda que quedan sin asignación tras regenerar.
+  const sinCubrir = (regs, dem) => {
+    const cubiertos = new Set(regs.map(a => `${a.rutaId}|${a.fecha}|${a.turnoIndex}`));
+    let n = 0;
+    for (const [rutaId, turnos] of Object.entries(dem))
+      for (const t of turnos)
+        if (!cubiertos.has(`${rutaId}|${t.fecha}|${t.turnoIndex}`)) n++;
+    return n;
+  };
+
+  // Línea base de turnos descubiertos por semana (solo con demanda): un swap
+  // no puede superarla.
+  const sinCubrirBase = demanda
+    ? asignacionesSemana.map((regs, w) => sinCubrir(regs, demanda[w]))
+    : null;
+
   for (let it = 0; it < maxIter; it++) {
     const antes = dispersion(asignacionesSemana);
     if (antes <= tolerancia) break;
@@ -31,6 +52,7 @@ export function corregirEquidad({ piscinas, asignacionesSemana, unidades, regene
 
     for (let w = 0; w < piscinas.length && !mejoro; w++) {
       const rutas = Object.keys(piscinas[w]);
+      const demW = demanda?.[w];
       for (let i = 0; i < rutas.length && !mejoro; i++) {
         for (let j = i + 1; j < rutas.length && !mejoro; j++) {
           const A = rutas[i], B = rutas[j];
@@ -40,8 +62,11 @@ export function corregirEquidad({ piscinas, asignacionesSemana, unidades, regene
               piscinas[w][A] = piscinas[w][A].map(x => (x === uA ? uB : x));
               piscinas[w][B] = piscinas[w][B].map(x => (x === uB ? uA : x));
               asignacionesSemana[w] = regenerarSemana(w);
-              if (dispersion(asignacionesSemana) < antes) {
+              const descubiertos = demW ? sinCubrir(asignacionesSemana[w], demW) : 0;
+              if (dispersion(asignacionesSemana) < antes &&
+                  (!demW || descubiertos <= sinCubrirBase[w])) {
                 cambios.push({ semana: w, rutaA: A, rutaB: B, saleA: uA, entraA: uB });
+                if (demW) sinCubrirBase[w] = descubiertos;
                 mejoro = true; break;
               }
               // revertir (FIX vs brief: el revert del brief reaplicaba el mismo
