@@ -73,6 +73,16 @@ export function generaPlanMes({ rutas, unidades, mes, anio }) {
     if (ociosas > 0) {
       advertencias.push(`${ociosas} ${ociosas === 1 ? 'unidad queda' : 'unidades quedan'} sin asignar a ninguna ruta (no operan en el mes).`);
     }
+    // Límite matemático: para que TODAS las unidades pasen por una ruta en el
+    // mes hace falta semanas × asignadas >= flota (una ruta con 1 unidad y
+    // flota de 20 solo puede ser recorrida por 5 unidades en 5 semanas —
+    // capacidad, no un defecto del algoritmo).
+    for (const ruta of rutas) {
+      const a = Math.floor(+ruta.asignadas);
+      if (semanas.length * a < unidades.length) {
+        advertencias.push(`Con ${a} ${a === 1 ? 'unidad asignada' : 'unidades asignadas'}, la ruta ${ruta.nombre} no alcanza para que todos los buses la recorran en el mes (hacen falta ${Math.ceil(unidades.length / semanas.length)} o más).`);
+      }
+    }
   }
   return { dias, asignaciones, metricas, advertencias, resumenEquidad, piscinas: corregido.piscinas };
 }
