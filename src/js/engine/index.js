@@ -58,6 +58,9 @@ export function generaPlanMes({ rutas, unidades, mes, anio }) {
   asignacionesSemana = corregido.asignacionesSemana;
 
   const asignaciones = asignacionesSemana.flat();                        // Paso 5
-  const { metricas, advertencias } = validar({ dias, asignaciones, unidades });
-  return { dias, asignaciones, metricas, advertencias, piscinas: corregido.piscinas };
+  // FIX vs decisión de Task 6: validar.js devuelve el resumen informativo de
+  // equidad en el campo aditivo `resumenEquidad` (ya no en `advertencias`);
+  // hay que propagarlo al plan para que los consumidores puedan leerlo.
+  const { metricas, advertencias, resumenEquidad } = validar({ dias, asignaciones, unidades });
+  return { dias, asignaciones, metricas, advertencias, resumenEquidad, piscinas: corregido.piscinas };
 }
