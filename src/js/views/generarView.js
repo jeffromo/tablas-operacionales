@@ -52,7 +52,10 @@ export function renderGenerar(el) {
     }
     try {
       const plan = generaPlanMes({ rutas: est.rutas, unidades: est.unidades, mes, anio });
-      sessionStorage.setItem('plan-actual', JSON.stringify(plan));
+      // Snapshot {plan, rutas}: si el operador edita rutas después de generar,
+      // Resultado/Excel siguen mostrando las rutas con las que se generó el plan
+      // (refs fix-final-brief hallazgo 5).
+      sessionStorage.setItem('plan-actual', JSON.stringify({ plan, rutas: est.rutas }));
       guardarEstado();
       document.querySelector('[data-tab="resultado"]').click();
     } catch (e) {

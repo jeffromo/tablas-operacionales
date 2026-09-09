@@ -24,10 +24,21 @@ export function renderResultado(el) {
     el.textContent = 'Genera primero una tabla en la pestaña Generar.';
     return;
   }
-  let plan;
+  let snap;
   try {
-    plan = JSON.parse(crudo);
+    snap = JSON.parse(crudo);
   } catch {
+    el.textContent = 'El plan guardado es inválido. Genera de nuevo la tabla.';
+    return;
+  }
+  // Snapshot {plan, rutas} (hallazgo 5): la vista y el Excel usan las rutas
+  // con las que se generó el plan, aunque el operador las edite después.
+  // Compatibilidad: un snapshot viejo guardaba el plan directamente — cae al
+  // estado actual.
+  const esSnapshot = snap && typeof snap === 'object' && snap.plan && Array.isArray(snap.rutas);
+  const plan = esSnapshot ? snap.plan : snap;
+  const rutas = esSnapshot ? snap.rutas : est.rutas;
+  if (!plan || !Array.isArray(plan.dias)) {
     el.textContent = 'El plan guardado es inválido. Genera de nuevo la tabla.';
     return;
   }
@@ -51,7 +62,7 @@ export function renderResultado(el) {
   // Una tabla por GRUPO de día (no una mezcla de todos los grupos de la ruta):
   // las fechas del plan se filtran por grupo.dias (dow) y solo cuentan para el
   // primer grupo que declara ese día, igual que turnosVigentes en el motor.
-  for (const ruta of est.rutas) {
+  for (const ruta of rutas) {
     for (const grupo of ruta.gruposDia) {
       const diasGrupo = plan.dias.filter(d =>
         grupo.dias.includes(d.dow) &&
@@ -98,6 +109,6 @@ export function renderResultado(el) {
   const btn = document.createElement('button');
   btn.className = 'primario';
   btn.textContent = 'Descargar Excel';
-  btn.onclick = () => descargarExcel(plan, est.rutas, `tabla-operacional-${plan.dias[0].fecha}.xlsx`);
+  btn.onclick = () => descargarExcel(plan, rutas, `tabla-operacional-${plan.dias[0].fecha}.xlsx`);
   el.appendChild(btn);
 }
