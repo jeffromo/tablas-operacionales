@@ -1,8 +1,6 @@
 import { estadoActual, guardarEstado, exportarJSON, importarJSON } from '../state.js';
 import { aMinutos } from '../engine/fechas.js';
 
-const DIAS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
-
 export function renderRutas(el) {
   const est = estadoActual();
   el.innerHTML = `
@@ -36,7 +34,7 @@ function tarjetaRuta(ruta, el) {
   div.innerHTML = `
     <div class="fila">
       <strong data-nombre></strong>
-      <label>Peso <input type="number" value="${ruta.peso}" min="0" style="width:60px" data-peso></label>
+      <label>Peso <input type="number" min="0" style="width:60px" data-peso></label>
       <button data-borrar>Eliminar</button>
     </div>
     <div class="fila">
@@ -49,6 +47,7 @@ function tarjetaRuta(ruta, el) {
     <table><thead><tr><th>#</th><th>Hora</th><th>Punto</th><th></th></tr></thead>
     <tbody data-turnos></tbody></table>`;
   div.querySelector('[data-nombre]').textContent = ruta.nombre;
+  div.querySelector('[data-peso]').value = String(Number(ruta.peso) || 0);
   div.querySelector('[data-peso]').onchange = e => { ruta.peso = +e.target.value; guardarEstado(); };
   div.querySelector('[data-borrar]').onclick = () => {
     const est = estadoActual();
@@ -58,8 +57,8 @@ function tarjetaRuta(ruta, el) {
   div.querySelector('[data-gen]').onclick = () => {
     const inicio = aMinutos(div.querySelector('[data-inicio]').value || '05:00');
     const fin = aMinutos(div.querySelector('[data-fin]').value || '21:00');
-    const frec = Math.max(1, +div.querySelector('[data-frec]').value || 7);
-    const pct = +div.querySelector('[data-pct]').value || 0;
+    const frec = Math.max(1, Math.round(+div.querySelector('[data-frec]').value || 7));
+    const pct = Math.min(100, Math.max(0, +div.querySelector('[data-pct]').value || 0));
     const horas = [];
     for (let m = inicio; m <= fin; m += frec) horas.push(m);
     const nInicio = Math.round(horas.length * pct / 100);
@@ -72,9 +71,10 @@ function tarjetaRuta(ruta, el) {
   const tbody = div.querySelector('[data-turnos]');
   ruta.gruposDia[0].turnos.forEach((t, i) => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${i + 1}</td><td class="hora">${t.hora}</td>
+    tr.innerHTML = `<td>${i + 1}</td><td class="hora" data-hora></td>
       <td><select data-punto><option${t.punto === 'INICIO' ? ' selected' : ''}>INICIO</option><option${t.punto === 'FIN' ? ' selected' : ''}>FIN</option></select></td>
       <td><button data-q>✕</button></td>`;
+    tr.querySelector('[data-hora]').textContent = t.hora;
     tr.querySelector('[data-punto]').onchange = e => { t.punto = e.target.value; guardarEstado(); };
     tr.querySelector('[data-q]').onclick = () => {
       ruta.gruposDia[0].turnos.splice(i, 1); guardarEstado(); renderRutas(el);
