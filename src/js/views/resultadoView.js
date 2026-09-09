@@ -48,42 +48,51 @@ export function renderResultado(el) {
     el.appendChild(linea);
   }
 
+  // Una tabla por GRUPO de día (no una mezcla de todos los grupos de la ruta):
+  // las fechas del plan se filtran por grupo.dias (dow) y solo cuentan para el
+  // primer grupo que declara ese día, igual que turnosVigentes en el motor.
   for (const ruta of est.rutas) {
-    const fechas = plan.dias.filter(d => d.turnos.some(t => t.rutaId === ruta.id)).map(d => d.fecha);
-    if (!fechas.length) continue;
+    for (const grupo of ruta.gruposDia) {
+      const diasGrupo = plan.dias.filter(d =>
+        grupo.dias.includes(d.dow) &&
+        ruta.gruposDia.find(g => g.dias.includes(d.dow)) === grupo &&
+        d.turnos.some(t => t.rutaId === ruta.id));
+      if (!diasGrupo.length) continue;
+      const fechas = diasGrupo.map(d => d.fecha);
 
-    const titulo = document.createElement('h2');
-    titulo.textContent = ruta.nombre;
-    el.appendChild(titulo);
+      const titulo = document.createElement('h2');
+      titulo.textContent = grupo.nombre ? `${ruta.nombre} ${grupo.nombre}` : ruta.nombre;
+      el.appendChild(titulo);
 
-    const nTurnos = Math.max(...plan.dias.flatMap(d => d.turnos
-      .filter(t => t.rutaId === ruta.id)
-      .map(t => t.turnoIndex))) + 1;
+      const nTurnos = Math.max(...diasGrupo.flatMap(d => d.turnos
+        .filter(t => t.rutaId === ruta.id)
+        .map(t => t.turnoIndex))) + 1;
 
-    const tabla = document.createElement('table');
-    const thead = document.createElement('thead');
-    const trh = document.createElement('tr');
-    for (const texto of ['TURNO', 'HORA', 'PUNTO', ...fechas.map(etiqueta)]) {
-      const th = document.createElement('th');
-      th.textContent = texto;
-      trh.appendChild(th);
-    }
-    thead.appendChild(trh);
-
-    const tbody = document.createElement('tbody');
-    for (let i = 0; i < nTurnos; i++) {
-      const t0 = plan.dias.flatMap(d => d.turnos)
-        .find(t => t.rutaId === ruta.id && t.turnoIndex === i);
-      const tr = document.createElement('tr');
-      tr.append(celda(i + 1), celda(t0?.hora || '', 'hora'), celda(t0?.punto || ''));
-      for (const f of fechas) {
-        const a = plan.asignaciones.find(x => x.fecha === f && x.rutaId === ruta.id && x.turnoIndex === i);
-        tr.append(celda(a?.unidadId ?? ''));
+      const tabla = document.createElement('table');
+      const thead = document.createElement('thead');
+      const trh = document.createElement('tr');
+      for (const texto of ['TURNO', 'HORA', 'PUNTO', ...fechas.map(etiqueta)]) {
+        const th = document.createElement('th');
+        th.textContent = texto;
+        trh.appendChild(th);
       }
-      tbody.appendChild(tr);
+      thead.appendChild(trh);
+
+      const tbody = document.createElement('tbody');
+      for (let i = 0; i < nTurnos; i++) {
+        const t0 = diasGrupo.flatMap(d => d.turnos)
+          .find(t => t.rutaId === ruta.id && t.turnoIndex === i);
+        const tr = document.createElement('tr');
+        tr.append(celda(i + 1), celda(t0?.hora || '', 'hora'), celda(t0?.punto || ''));
+        for (const f of fechas) {
+          const a = plan.asignaciones.find(x => x.fecha === f && x.rutaId === ruta.id && x.turnoIndex === i);
+          tr.append(celda(a?.unidadId ?? ''));
+        }
+        tbody.appendChild(tr);
+      }
+      tabla.append(thead, tbody);
+      el.appendChild(tabla);
     }
-    tabla.append(thead, tbody);
-    el.appendChild(tabla);
   }
 
   const btn = document.createElement('button');
