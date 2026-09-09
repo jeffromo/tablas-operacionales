@@ -86,3 +86,27 @@ test('piscinas explícitas que exceden la flota: recorte defensivo proporcional'
     assert.equal(new Set([...semana.A, ...semana.B]).size, 10);
   }
 });
+
+test('diseño balanceado: cuando el mes no alcanza para el ciclo, cada unidad visita el máximo de rutas', () => {
+  // 7/5/4/3/1 con flota de 20: imposible que las 20 unidades pasen por R4 y
+  // R5 (semanas × asignadas < flota). El diseño codicioso debe maximizar.
+  const rutas = [7, 5, 4, 3, 1].map((a, i) => ({ id: `R${i + 1}`, asignadas: a }));
+  const u20 = Array.from({ length: 20 }, (_, i) => ({ id: String(i + 1) }));
+  const piscinas = repartirPiscinas({ rutas, unidades: u20, nSemanas: 5, demandaRuta: {} });
+  assert.equal(piscinas.length, 5);
+  for (const semana of piscinas) {
+    [7, 5, 4, 3, 1].forEach((a, i) => assert.equal(semana[`R${i + 1}`].length, a));
+    const todas = Object.values(semana).flat();
+    assert.equal(new Set(todas).size, 20);          // sin repetidos ni faltantes
+  }
+  const cobertura = u20.map(() => new Set());
+  piscinas.forEach(semana => {
+    for (const [rid, pool] of Object.entries(semana)) {
+      for (const id of pool) cobertura[+id - 1].add(rid);
+    }
+  });
+  const nRutas = cobertura.map(s => s.size);
+  assert.ok(Math.min(...nRutas) >= 3, 'cada unidad visita al menos 3 rutas');
+  const promedio = nRutas.reduce((a, b) => a + b, 0) / 20;
+  assert.ok(promedio >= 3.8, `promedio de rutas visitadas ${promedio} >= 3.8`);
+});
