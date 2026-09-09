@@ -44,10 +44,15 @@ export function renderGenerar(el) {
     if (!est.rutas.length) return aviso(chequeo, 'Configura al menos una ruta.');
     if (!est.unidades.length) return aviso(chequeo, 'Agrega al menos una unidad.');
     for (const ruta of est.rutas) {
-      const dias = expandirMes({ rutas: [ruta], mes, anio });
-      const vacios = dias.filter(d => d.dow !== null && d.turnos.length === 0).length;
-      if (vacios === dias.length) {
-        return aviso(chequeo, `La ruta ${ruta.nombre} no tiene turnos configurados.`);
+      try {
+        const dias = expandirMes({ rutas: [ruta], mes, anio });
+        const vacios = dias.filter(d => d.dow !== null && d.turnos.length === 0).length;
+        if (vacios === dias.length) {
+          return aviso(chequeo, `La ruta ${ruta.nombre} no tiene turnos configurados.`);
+        }
+      } catch (e) {
+        console.error('Chequeo previo falló para', ruta?.nombre, e);
+        return aviso(chequeo, `La ruta ${ruta?.nombre ?? '(sin nombre)'} tiene datos inválidos. Elimínala y vuelve a crearla.`);
       }
     }
     try {
@@ -59,7 +64,15 @@ export function renderGenerar(el) {
       guardarEstado();
       document.querySelector('[data-tab="resultado"]').click();
     } catch (e) {
-      aviso(chequeo, `Error al generar: ${e.message}`);
+      // Si el fallo vino de la navegación a Resultado, `chequeo` ya está fuera
+      // del DOM y el aviso sería invisible — se re-renderiza Generar primero.
+      console.error('Error al generar:', e);
+      if (!chequeo.isConnected) {
+        renderGenerar(el);
+        aviso(el.querySelector('#chequeo'), `Error al generar: ${e.message}`);
+      } else {
+        aviso(chequeo, `Error al generar: ${e.message}`);
+      }
     }
   };
 }
