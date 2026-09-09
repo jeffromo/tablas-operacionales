@@ -220,3 +220,19 @@ select[data-punto] { padding: 3px 6px; font-size: 12px; }
 .ruta-acordeon.abierta .chevron { transform: rotate(90deg); }
 .resumen-ruta { margin-left: auto; color: var(--color-texto-suave); font-size: 12px; }
 [data-cuerpo] > .fila:first-child { margin-top: 12px; }
+
+/* Indicador de generación en curso */
+.generando {
+  background: var(--color-primario-suave);
+  color: var(--color-primario-oscuro);
+  border: 1px solid var(--color-primario);
+  padding: 10px 14px;
+  border-radius: var(--radio-chico);
+  margin: 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+/* Acordeones de Resultado: mismo estilo que el de Rutas */
+.acordeon-resultado { padding: 12px 14px; }
+.acordeon-resultado [data-cuerpo] { margin-top: 10px; }
+.acordeon-resultado table { margin: 0; }

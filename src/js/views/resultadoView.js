@@ -62,6 +62,8 @@ export function renderResultado(el) {
   // Una tabla por GRUPO de día (no una mezcla de todos los grupos de la ruta):
   // las fechas del plan se filtran por grupo.dias (dow) y solo cuentan para el
   // primer grupo que declara ese día, igual que turnosVigentes en el motor.
+  // Cada tabla va en un acordeón (cabecera con resumen, cuerpo plegable).
+  let primerGrupo = true;
   for (const ruta of rutas) {
     for (const grupo of ruta.gruposDia) {
       const diasGrupo = plan.dias.filter(d =>
@@ -71,13 +73,36 @@ export function renderResultado(el) {
       if (!diasGrupo.length) continue;
       const fechas = diasGrupo.map(d => d.fecha);
 
-      const titulo = document.createElement('h2');
-      titulo.textContent = grupo.nombre ? `${ruta.nombre} ${grupo.nombre}` : ruta.nombre;
-      el.appendChild(titulo);
-
       const nTurnos = Math.max(...diasGrupo.flatMap(d => d.turnos
         .filter(t => t.rutaId === ruta.id)
         .map(t => t.turnoIndex))) + 1;
+
+      const acc = document.createElement('div');
+      acc.className = 'tarjeta ruta-acordeon acordeon-resultado';
+      const abierta = primerGrupo;
+      primerGrupo = false;
+      acc.innerHTML = `
+        <button type="button" class="cabecera-ruta" data-toggle aria-expanded="${abierta}">
+          <span class="chevron" aria-hidden="true">▸</span>
+          <strong data-titulo></strong>
+          <span class="resumen-ruta" data-resumen></span>
+        </button>
+        <div data-cuerpo></div>`;
+      acc.querySelector('[data-titulo]').textContent =
+        grupo.nombre ? `${ruta.nombre} ${grupo.nombre}` : ruta.nombre;
+      acc.querySelector('[data-resumen]').textContent =
+        `${fechas.length} días · ${nTurnos} turnos`;
+      const cuerpo = acc.querySelector('[data-cuerpo]');
+      cuerpo.hidden = !abierta;
+      if (abierta) acc.classList.add('abierta');
+
+      acc.querySelector('[data-toggle]').onclick = () => {
+        const nueva = cuerpo.hidden;
+        cuerpo.hidden = !nueva;
+        acc.classList.toggle('abierta', nueva);
+        acc.querySelector('[data-toggle]').setAttribute('aria-expanded', String(nueva));
+      };
+      el.appendChild(acc);
 
       const tabla = document.createElement('table');
       const thead = document.createElement('thead');
@@ -102,7 +127,7 @@ export function renderResultado(el) {
         tbody.appendChild(tr);
       }
       tabla.append(thead, tbody);
-      el.appendChild(tabla);
+      cuerpo.appendChild(tabla);
     }
   }
 

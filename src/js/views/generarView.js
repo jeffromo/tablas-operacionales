@@ -55,24 +55,39 @@ export function renderGenerar(el) {
         return aviso(chequeo, `La ruta ${ruta?.nombre ?? '(sin nombre)'} tiene datos inválidos. Elimínala y vuelve a crearla.`);
       }
     }
-    try {
-      const plan = generaPlanMes({ rutas: est.rutas, unidades: est.unidades, mes, anio });
-      // Snapshot {plan, rutas}: si el operador edita rutas después de generar,
-      // Resultado/Excel siguen mostrando las rutas con las que se generó el plan
-      // (refs fix-final-brief hallazgo 5).
-      sessionStorage.setItem('plan-actual', JSON.stringify({ plan, rutas: est.rutas }));
-      guardarEstado();
-      document.querySelector('[data-tab="resultado"]').click();
-    } catch (e) {
-      // Si el fallo vino de la navegación a Resultado, `chequeo` ya está fuera
-      // del DOM y el aviso sería invisible — se re-renderiza Generar primero.
-      console.error('Error al generar:', e);
-      if (!chequeo.isConnected) {
-        renderGenerar(el);
-        aviso(el.querySelector('#chequeo'), `Error al generar: ${e.message}`);
-      } else {
-        aviso(chequeo, `Error al generar: ${e.message}`);
+    // Indicador "Generando…": el cálculo es síncrono y puede tardar varios
+    // segundos; se cede el hilo a la UI (rAF + setTimeout) para que el aviso
+    // pinte ANTES de que arranque el cálculo.
+    const btn = el.querySelector('#generar');
+    btn.disabled = true;
+    const previo = btn.textContent;
+    btn.textContent = 'Generando…';
+    const indicador = document.createElement('div');
+    indicador.className = 'generando';
+    indicador.textContent = 'Generando tabla operacional… (puede tardar unos segundos)';
+    chequeo.replaceChildren(indicador);
+    requestAnimationFrame(() => setTimeout(() => {
+      try {
+        const plan = generaPlanMes({ rutas: est.rutas, unidades: est.unidades, mes, anio });
+        // Snapshot {plan, rutas}: si el operador edita rutas después de generar,
+        // Resultado/Excel siguen mostrando las rutas con las que se generó el plan
+        // (refs fix-final-brief hallazgo 5).
+        sessionStorage.setItem('plan-actual', JSON.stringify({ plan, rutas: est.rutas }));
+        guardarEstado();
+        document.querySelector('[data-tab="resultado"]').click();
+      } catch (e) {
+        // Si el fallo vino de la navegación a Resultado, `chequeo` ya está fuera
+        // del DOM y el aviso sería invisible — se re-renderiza Generar primero.
+        console.error('Error al generar:', e);
+        btn.disabled = false;
+        btn.textContent = previo;
+        if (!chequeo.isConnected) {
+          renderGenerar(el);
+          aviso(el.querySelector('#chequeo'), `Error al generar: ${e.message}`);
+        } else {
+          aviso(chequeo, `Error al generar: ${e.message}`);
+        }
       }
-    }
+    }, 0));
   };
 }
