@@ -65,5 +65,14 @@ export function generaPlanMes({ rutas, unidades, mes, anio }) {
   // equidad en el campo aditivo `resumenEquidad` (ya no en `advertencias`);
   // hay que propagarlo al plan para que los consumidores puedan leerlo.
   const { metricas, advertencias, resumenEquidad } = validar({ dias, asignaciones, unidades });
+  // Modo explícito con flota sobrante: avisar las unidades que no operan.
+  const todasExplicitas = rutas.length > 0 && rutas.every(r => Number.isFinite(+r.asignadas) && +r.asignadas > 0);
+  if (todasExplicitas) {
+    const suma = rutas.reduce((n, r) => n + Math.floor(+r.asignadas), 0);
+    const ociosas = unidades.length - suma;
+    if (ociosas > 0) {
+      advertencias.push(`${ociosas} ${ociosas === 1 ? 'unidad queda' : 'unidades quedan'} sin asignar a ninguna ruta (no operan en el mes).`);
+    }
+  }
   return { dias, asignaciones, metricas, advertencias, resumenEquidad, piscinas: corregido.piscinas };
 }

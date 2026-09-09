@@ -6,7 +6,7 @@ const CLAVE = 'tablas-operacionales-v1';
 function normalizarRutas(rutas) {
   if (!Array.isArray(rutas)) return [];
   return rutas.map(r => {
-    if (!r || typeof r !== 'object') return { id: String(crypto.randomUUID()), nombre: 'Ruta sin nombre', peso: 1, gruposDia: [] };
+    if (!r || typeof r !== 'object') return { id: String(crypto.randomUUID()), nombre: 'Ruta sin nombre', asignadas: 1, gruposDia: [] };
     let grupos = Array.isArray(r.gruposDia) ? r.gruposDia : null;
     if (!grupos && Array.isArray(r.turnos)) grupos = [{ nombre: 'L-D', dias: [0,1,2,3,4,5,6], turnos: r.turnos }];
     if (!grupos) grupos = [];
@@ -15,7 +15,15 @@ function normalizarRutas(rutas) {
       dias: Array.isArray(g?.dias) ? g.dias : [],
       turnos: Array.isArray(g?.turnos) ? g.turnos : [],
     }));
-    return { ...r, id: r.id ?? String(crypto.randomUUID()), gruposDia: grupos };
+    return {
+      ...r,
+      id: r.id ?? String(crypto.randomUUID()),
+      // `asignadas` (unidades por ruta) es nuevo: configs viejas sin él quedan
+      // en undefined y el motor reparte proporcional a la demanda. `peso` era
+      // un peso relativo, NO se migra a unidades (semántica distinta).
+      asignadas: Number.isFinite(+r.asignadas) && +r.asignadas > 0 ? Math.floor(+r.asignadas) : undefined,
+      gruposDia: grupos,
+    };
   });
 }
 

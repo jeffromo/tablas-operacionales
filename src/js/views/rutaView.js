@@ -25,7 +25,7 @@ export function renderRutas(el) {
   el.querySelector('#agregar').onclick = () => {
     const nombre = el.querySelector('#nueva-ruta').value.trim();
     if (!nombre) return alert('Escribe un nombre de ruta');
-    const nueva = { id: crypto.randomUUID(), nombre, peso: 1,
+    const nueva = { id: crypto.randomUUID(), nombre, asignadas: 1,
       gruposDia: [{ nombre: 'L-D', dias: [0,1,2,3,4,5,6], turnos: [] }] };
     est.rutas.push(nueva);
     expandidas.add(nueva.id);
@@ -53,7 +53,7 @@ function tarjetaRuta(ruta, el) {
     </button>
     <div data-cuerpo>
       <div class="fila">
-        <label>Peso <input type="number" min="0" style="width:60px" data-peso></label>
+        <label>Unidades asignadas <input type="number" min="1" placeholder="auto" style="width:70px" data-asignadas></label>
         <button data-borrar>Eliminar</button>
       </div>
       <div data-grupos></div>
@@ -62,9 +62,10 @@ function tarjetaRuta(ruta, el) {
   div.querySelector('[data-nombre]').textContent = ruta.nombre;
   const nGrupos = ruta.gruposDia.length;
   const nTurnos = ruta.gruposDia.reduce((n, g) => n + (g.turnos?.length || 0), 0);
+  const asignadas = Number.isFinite(+ruta.asignadas) && +ruta.asignadas > 0 ? Math.floor(+ruta.asignadas) : null;
   div.querySelector('[data-resumen]').textContent =
-    `${nGrupos} ${nGrupos === 1 ? 'grupo' : 'grupos'} · ${nTurnos} turnos · peso ${Number(ruta.peso) || 0}`;
-  div.querySelector('[data-peso]').value = String(Number(ruta.peso) || 0);
+    `${nGrupos} ${nGrupos === 1 ? 'grupo' : 'grupos'} · ${nTurnos} turnos · ${asignadas === null ? 'unidades: auto' : `${asignadas} unidades asignadas`}`;
+  div.querySelector('[data-asignadas]').value = asignadas === null ? '' : String(asignadas);
   const cuerpo = div.querySelector('[data-cuerpo]');
   cuerpo.hidden = !abierta;
   if (abierta) div.classList.add('abierta');
@@ -81,7 +82,12 @@ function tarjetaRuta(ruta, el) {
       div.querySelector('[data-toggle]').setAttribute('aria-expanded', 'true');
     }
   };
-  div.querySelector('[data-peso]').onchange = e => { ruta.peso = +e.target.value; guardarEstado(); };
+  // Vacío = reparto automático (proporcional a la demanda); un nº = fijo.
+  div.querySelector('[data-asignadas]').onchange = e => {
+    const v = +e.target.value;
+    ruta.asignadas = Number.isFinite(v) && v > 0 ? Math.floor(v) : undefined;
+    guardarEstado(); renderRutas(el);
+  };
   div.querySelector('[data-borrar]').onclick = () => {
     const est = estadoActual();
     est.rutas = est.rutas.filter(r => r.id !== ruta.id);

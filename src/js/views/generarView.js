@@ -55,6 +55,14 @@ export function renderGenerar(el) {
         return aviso(chequeo, `La ruta ${ruta?.nombre ?? '(sin nombre)'} tiene datos inválidos. Elimínala y vuelve a crearla.`);
       }
     }
+    // Unidades asignadas explícitas: la suma no puede superar la flota.
+    const todasExplicitas = est.rutas.every(r => Number.isFinite(+r.asignadas) && +r.asignadas > 0);
+    if (todasExplicitas) {
+      const suma = est.rutas.reduce((n, r) => n + Math.floor(+r.asignadas), 0);
+      if (suma > est.unidades.length) {
+        return aviso(chequeo, `La suma de unidades asignadas (${suma}) supera la flota (${est.unidades.length}). Ajusta las rutas.`);
+      }
+    }
     // Indicador "Generando…": el cálculo es síncrono y puede tardar varios
     // segundos; se cede el hilo a la UI (rAF + setTimeout) para que el aviso
     // pinte ANTES de que arranque el cálculo.

@@ -35,3 +35,54 @@ test('flota insuficiente: piscinas por demanda aunque excedan la flota', () => {
   assert.equal(piscinas[0].A.length, 8 - 4); // se recorta proporcionalmente: A queda con lo disponible
   assert.equal(piscinas[0].A.length + piscinas[0].B.length, 6); // toda la flota asignada
 });
+
+// Modelo nuevo: tamaños de piscina EXPLÍCITOS por ruta (ruta.asignadas).
+test('piscinas explícitas: tamaños fijos por ruta y unidades sobrantes ociosas', () => {
+  const rutas = [{ id: 'A', asignadas: 4 }, { id: 'B', asignadas: 3 }, { id: 'C', asignadas: 3 }];
+  const piscinas = repartirPiscinas({ rutas, unidades, nSemanas: 5, demandaRuta: { A: 8, B: 4, C: 4 } });
+  assert.equal(piscinas.length, 5);
+  for (const semana of piscinas) {
+    assert.equal(semana.A.length, 4);  // fijo, ignorando la demanda
+    assert.equal(semana.B.length, 3);
+    assert.equal(semana.C.length, 3);
+  }
+  // Sobra 1 unidad (suma 10 = flota aquí): sin repetidos.
+  for (const semana of piscinas) {
+    const todas = [...semana.A, ...semana.B, ...semana.C];
+    assert.equal(new Set(todas).size, 10);
+  }
+});
+
+test('piscinas explícitas menores que la flota: el resto queda sin asignar', () => {
+  const rutas = [{ id: 'A', asignadas: 2 }, { id: 'B', asignadas: 2 }];
+  const piscinas = repartirPiscinas({ rutas, unidades, nSemanas: 4, demandaRuta: { A: 3, B: 3 } });
+  for (const semana of piscinas) {
+    const todas = [...semana.A, ...semana.B];
+    assert.equal(todas.length, 4);                 // solo 6 de 10 operan
+    assert.equal(new Set(todas).size, 4);
+  }
+});
+
+test('piscinas explícitas: TODAS las unidades pasan por TODAS las rutas en el mes', () => {
+  const rutas = [{ id: 'A', asignadas: 4 }, { id: 'B', asignadas: 3 }, { id: 'C', asignadas: 3 }];
+  const piscinas = repartirPiscinas({ rutas, unidades, nSemanas: 5, demandaRuta: { A: 8, B: 4, C: 4 } });
+  for (const id of ['1', '5', '10']) {
+    const rutasVisitadas = new Set();
+    for (const semana of piscinas) {
+      for (const [rutaId, pool] of Object.entries(semana)) {
+        if (pool.includes(id)) rutasVisitadas.add(rutaId);
+      }
+    }
+    assert.deepEqual([...rutasVisitadas].sort(), ['A', 'B', 'C'],
+      `la unidad ${id} debe visitar todas las rutas`);
+  }
+});
+
+test('piscinas explícitas que exceden la flota: recorte defensivo proporcional', () => {
+  const rutas = [{ id: 'A', asignadas: 8 }, { id: 'B', asignadas: 4 }]; // 12 > 10
+  const piscinas = repartirPiscinas({ rutas, unidades, nSemanas: 4, demandaRuta: { A: 6, B: 2 } });
+  for (const semana of piscinas) {
+    assert.equal(semana.A.length + semana.B.length, 10);
+    assert.equal(new Set([...semana.A, ...semana.B]).size, 10);
+  }
+});
