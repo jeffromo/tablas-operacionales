@@ -12,9 +12,39 @@ function getXLSX() {
 
 const DIAS = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
 
+const fmtH = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+
+// Horario de operación del grupo con formato H:MM a H:MM (ej. "04:50 a 21:00");
+// un grupo sin turnos no produce Infinity (min de vacío), dice "sin turnos".
+function operacion(grupo) {
+  if (!grupo.turnos.length) return 'OPERACIÓN sin turnos';
+  const mins = grupo.turnos.map(t => aMinutos(t.hora));
+  return `OPERACIÓN ${fmtH(Math.min(...mins))} a ${fmtH(Math.max(...mins))}`;
+}
+
+// Nombres de hoja únicos y válidos para Excel (máx. 31 caracteres, sin
+// []:*?/\). Dos grupos con nombre largo ya no colisionan: el repetido recibe
+// sufijo -2, -3, ... con espacio garantizado para el sufijo.
+function creadorNombresHoja() {
+  const usados = new Set();
+  return (nombre) => {
+    const base = nombre.replace(/[\[\]:*?\/\\]/g, ' ').trim() || 'Hoja';
+    let candidato = base.slice(0, 31);
+    let n = 2;
+    while (usados.has(candidato)) {
+      const sufijo = `-${n}`;
+      candidato = base.slice(0, 31 - sufijo.length) + sufijo;
+      n++;
+    }
+    usados.add(candidato);
+    return candidato;
+  };
+}
+
 export function planAWorkbook(plan, rutas) {
   const XLSX = getXLSX();
   const wb = XLSX.utils.book_new();
+  const nombreHoja = creadorNombresHoja();
 
   for (const ruta of rutas) {
     for (const grupo of ruta.gruposDia) {
@@ -24,7 +54,7 @@ export function planAWorkbook(plan, rutas) {
       if (!fechas.length) continue;
 
       const filas = [];
-      filas.push([`RUTA ${ruta.nombre}`, '', `OPERACIÓN ${Math.min(...grupo.turnos.map(t => aMinutos(t.hora))) / 60 | 0}H`]);
+      filas.push([`RUTA ${ruta.nombre}`, '', operacion(grupo)]);
       filas.push([]);
       filas.push(['TURNO', 'HORA', 'PUNTO', ...fechas.map(f => {
         const [a, m, d] = f.split('-');
@@ -41,8 +71,8 @@ export function planAWorkbook(plan, rutas) {
         filas.push(fila);
       });
 
-      const nombreHoja = `${ruta.nombre} ${grupo.nombre}`.slice(0, 31);
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filas), nombreHoja);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filas),
+        nombreHoja(`${ruta.nombre} ${grupo.nombre}`));
     }
   }
 
