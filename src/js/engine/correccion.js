@@ -1,7 +1,14 @@
+// Días trabajados por unidad: cuenta FECHAS DISTINTAS, no asignaciones
+// (spec §5 Paso 5 y §11: la métrica "DÍAS TRABAJADOS" y la tolerancia ±1 se
+// prometen en días). Con la relajación de cobertura una unidad puede cubrir
+// doble turno el mismo día; eso sigue sumando 1 día.
 export function diasTrabajados(asignaciones) {
-  const m = new Map();
-  for (const a of asignaciones) m.set(a.unidadId, (m.get(a.unidadId) || 0) + 1);
-  return m;
+  const fechas = new Map();
+  for (const a of asignaciones) {
+    if (!fechas.has(a.unidadId)) fechas.set(a.unidadId, new Set());
+    fechas.get(a.unidadId).add(a.fecha ?? '');
+  }
+  return new Map([...fechas].map(([id, s]) => [id, s.size]));
 }
 
 // Paso 4: intercambia unidades entre piscinas de distintas rutas (misma semana)

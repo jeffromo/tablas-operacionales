@@ -2,9 +2,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { diasTrabajados, corregirEquidad } from '../src/js/engine/correccion.js';
 
-test('diasTrabajados cuenta asignaciones por unidad', () => {
+// FIX hallazgo 3: diasTrabajados cuenta FECHAS DISTINTAS por unidad, no
+// asignaciones — la métrica "DÍAS TRABAJADOS" (spec §11, tolerancia ±1) se
+// promete en días; con la relajación de cobertura una unidad con doble turno
+// el mismo día debe seguir sumando 1.
+test('diasTrabajados cuenta fechas distintas por unidad', () => {
   const m = diasTrabajados([
-    { unidadId: 'A' }, { unidadId: 'A' }, { unidadId: 'B' },
+    { unidadId: 'A', fecha: '2026-09-01' },
+    { unidadId: 'A', fecha: '2026-09-01' }, // doble turno el mismo día: suma 1
+    { unidadId: 'A', fecha: '2026-09-02' },
+    { unidadId: 'B', fecha: '2026-09-01' },
   ]);
   assert.equal(m.get('A'), 2);
   assert.equal(m.get('B'), 1);

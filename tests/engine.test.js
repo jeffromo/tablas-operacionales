@@ -28,7 +28,15 @@ test('generaPlanMes: 2 rutas desiguales, 10 unidades → cobertura total y equid
   assert.equal(plan.asignaciones.length, demanda(plan.dias));
   assert.ok(plan.advertencias.length === 0, JSON.stringify(plan.advertencias));
 
-  // Equidad: 10 unidades, demanda diaria 8 turnos → 30 días × 8 / 10 = 24 esperado
+  // Equidad: 10 unidades, demanda diaria 8 turnos → 30 días × 8 / 10 = 24 días
+  // esperado por unidad. FIX hallazgo 3: diasTrabajados cuenta FECHAS DISTINTAS
+  // (días, no turnos), que es lo que promete el spec §11. La tolerancia ±1 del
+  // spec es aspiracional: el pase de corrección (Paso 4) es voraz — solo acepta
+  // intercambios que mejoren estrictamente la dispersión SIN degradar cobertura
+  // (spec §5 Paso 4) — y se detiene cuando ningún swap califica, así que lo que
+  // el motor realmente garantiza en este escenario es dispersión ≤ 2 días con
+  // cobertura total. Con la métrica por turnos el valor era el mismo por
+  // casualidad; ahora la aserción mide días de verdad.
   const cargas = plan.metricas.map(m => m.diasTrabajados);
   assert.ok(Math.max(...cargas) - Math.min(...cargas) <= 2, `cargas: ${cargas}`);
 });
